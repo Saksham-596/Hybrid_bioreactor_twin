@@ -13,9 +13,17 @@ from datetime import datetime
 load_dotenv()
 app = FastAPI(title="Bioreactor Hybrid Twin")
 
+origins = [
+
+    "https://hybrid-bioreactor-twin.vercel.app",
+
+    # "http://localhost:3000"  # Keeping localhost so it still works on your Mac!
+
+]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=origins,
     allow_credentials=False,
     allow_methods=["*"],
     allow_headers=["*"],
