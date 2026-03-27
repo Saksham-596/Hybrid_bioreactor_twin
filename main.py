@@ -5,10 +5,10 @@ import numpy as np
 from scipy.integrate import odeint
 import joblib
 import os
+import certifi
 from dotenv import load_dotenv
 from motor.motor_asyncio import AsyncIOMotorClient
 from datetime import datetime
-
 
 load_dotenv()
 app = FastAPI(title="Bioreactor Hybrid Twin")
@@ -20,20 +20,11 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
-MONGO_URI = os.getenv("MONGO_URI")
-client = AsyncIOMotorClient(MONGO_URI)
-db = client.biotwin_db        
-collection = db.batch_history 
-import certifi 
-
-
-
 
 MONGO_URI = os.getenv("MONGO_URI")
 client = AsyncIOMotorClient(MONGO_URI, tlsCAFile=certifi.where())
 db = client.biotwin_db        
 collection = db.batch_history
-
 
 MODEL_PATH = "hybrid_error_predictor.pkl"
 if os.path.exists(MODEL_PATH):
@@ -67,12 +58,9 @@ async def run_hybrid_simulation(params: HybridParams):
     y0 = [params.X0, params.S0]
     args = (params.mu_max, params.Ks, params.Y, params.D, params.Sf)
     
-    
     ideal_solution = odeint(monod_kinetics, y0, t_vec, args=args)
     ideal_X = ideal_solution[:, 0]
-    ideal_S = ideal_solution[:, 1]
-
-
+    
     ml_inputs = np.column_stack((t_vec, np.full_like(t_vec, params.toxicity_factor)))
     predicted_errors = model.predict(ml_inputs)
 
@@ -104,6 +92,6 @@ async def run_hybrid_simulation(params: HybridParams):
 
 @app.get("/history")
 async def get_simulation_history():
-    cursor = collection.find({}, {"_id": 0, "data": 0}).sort("timestamp", -1).limit(10)
+    cursor = collection.find({}, {"_id": 0}).sort("timestamp", -1).limit(10)
     history = await cursor.to_list(length=10)
     return {"status": "success", "history": history}

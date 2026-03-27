@@ -15,7 +15,8 @@ export default function BioreactorDashboard() {
   // Fetch History from MongoDB
   const fetchHistory = async () => {
     try {
-      const response = await fetch('http://localhost:8000/history');
+      const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+      const response = await fetch(`${API_BASE}/history`);
       const result = await response.json();
       if (result.status === 'success') {
         setHistory(result.history);
@@ -29,7 +30,8 @@ export default function BioreactorDashboard() {
   const runSimulation = async () => {
     setLoading(true);
     try {
-      const response = await fetch('http://localhost:8000/simulate/hybrid', {
+      const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+      const response = await fetch(`${API_BASE}/simulate/hybrid`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ ...params, t_end: 50, steps: 100 }),
@@ -121,7 +123,14 @@ export default function BioreactorDashboard() {
                 <p className="text-xs text-slate-500 font-mono text-center py-4">No batches recorded yet.</p>
               ) : (
                 history.map((run: any, idx: number) => (
-                  <div key={idx} className="bg-slate-800/50 p-3 rounded border border-slate-700 flex justify-between items-center hover:bg-slate-800 transition-colors">
+                  <div 
+                    key={idx} 
+                    onClick={() => {
+                      if (run.data) setData(run.data);
+                      if (run.parameters) setParams(run.parameters);
+                    }}
+                    className="bg-slate-800/50 p-3 rounded border border-slate-700 flex justify-between items-center hover:bg-slate-700 cursor-pointer transition-colors"
+                  >
                     <div>
                       <p className="text-xs text-slate-400 font-mono">
                         {new Date(run.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
