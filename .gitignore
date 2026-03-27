@@ -1,0 +1,13 @@
+# Security (CRITICAL)
+.env
+
+# Virtual Environments
+.venv/
+venv/
+__pycache__/
+
+# Mac System Files
+.DS_Store
+
+# Data
+*.csv
