@@ -1,3 +1,5 @@
+from unittest import result
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
@@ -42,6 +44,7 @@ else:
     print("Warning: ML model not found. Hybrid endpoint will fail.")
 
 class HybridParams(BaseModel):
+    session_id :str ="anonymous"
     mu_max: float = 0.5
     Ks: float = 2.0
     Y: float = 0.5
@@ -84,6 +87,7 @@ async def run_hybrid_simulation(params: HybridParams):
         })
     
     batch_record = {
+        "session_id": params.session_id,
         "timestamp": datetime.utcnow().isoformat(),
         "parameters": params.model_dump(),
         "final_hybrid_biomass": results[-1]["hybrid_biomass"],
@@ -99,7 +103,12 @@ async def run_hybrid_simulation(params: HybridParams):
     }
 
 @app.get("/history")
-async def get_simulation_history():
-    cursor = collection.find({}, {"_id": 0}).sort("timestamp", -1).limit(10)
+async def get_simulation_history(session_id: str="anonymous"):
+    cursor = collection.find({"session_id": session_id}, {"_id": 0}).sort("timestamp", -1).limit(10)
     history = await cursor.to_list(length=10)
     return {"status": "success", "history": history}
+
+@app.delete("/history/clear")
+async def clear_simulation_history(session_id: str ="anonymous"):
+    result = await collection.delete_many({"session_id": session_id})
+    return {"status": "success", "delete_count": result.deleted_count}

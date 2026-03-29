@@ -2,7 +2,7 @@ import numpy as np
 import pandas as pd
 from scipy.integrate import odeint
 
-# kinetics with some toxicity and inhibition , Haldane equation 
+ 
 def reality_kinetics(y, t, mu_max, Ks, Y, D, Sf, Ki, toxicity):
     X, S = y
     actual_mu_max = mu_max * (1.0 - toxicity)
@@ -12,7 +12,6 @@ def reality_kinetics(y, t, mu_max, Ks, Y, D, Sf, Ki, toxicity):
     dSdt = D * (Sf - S) - (mu_real * X) / Y
     return [dXdt, dSdt]
 
-# normal kinetics 
 def ideal_kinetics(y, t, mu_max, Ks, Y, D, Sf):
     X, S = y
     mu = (mu_max * S) / (Ks + S)
@@ -21,13 +20,13 @@ def ideal_kinetics(y, t, mu_max, Ks, Y, D, Sf):
     return [dXdt, dSdt]
 
 def generate_training_data(num_batches=100):
-    t = np.linspace(0, 50, 100) # 50 hours 100 time steps
+    t = np.linspace(0, 50, 100) 
     dataset = []
 
     print(f"Generating {num_batches} simulated batches...")
 
     for batch_id in range(num_batches):
-        # Randomize initial conditions slightly for each batch
+       
         X0 = np.random.uniform(0.05, 0.15)
         S0 = np.random.uniform(15.0, 25.0)
         y0 = [X0, S0]
@@ -38,17 +37,15 @@ def generate_training_data(num_batches=100):
         Ki = np.random.uniform(10.0, 50.0) #Inhibition constant
         toxicity = np.random.uniform(0.0, 0.3) # 0% to 30% loss of efficiency
 
-        # Run both simulations
+       
         ideal_sol = odeint(ideal_kinetics, y0, t, args=(mu_max, Ks, Y, D, Sf))
         real_sol = odeint(reality_kinetics, y0, t, args=(mu_max, Ks, Y, D, Sf, Ki, toxicity))
 
-        # Add sensor noise to the real data for realism
         real_X = real_sol[:, 0] + np.random.normal(0, 0.02, len(t))
         real_S = real_sol[:, 1] + np.random.normal(0, 0.5, len(t))
         ideal_X = ideal_sol[:, 0]
         ideal_S = ideal_sol[:, 1]
 
-        # error 
         error_X = real_X - ideal_X
 
         for i in range(len(t)):
@@ -59,12 +56,12 @@ def generate_training_data(num_batches=100):
                 "ideal_S": round(ideal_S[i], 4),
                 "real_X": round(real_X[i], 4),
                 "real_S": round(real_S[i], 4),
-                "error_X": round(error_X[i], 4), # Target variable for ML
-                "toxicity_factor": round(toxicity, 4) # Feature variable
+                "error_X": round(error_X[i], 4), 
+                "toxicity_factor": round(toxicity, 4) 
             })
     df = pd.DataFrame(dataset)
     df.to_csv("bioreactor_training_data.csv", index=False)
     print("Saved to bioreactor_training_data.csv. Ready for ML training.")
-
+    
 if __name__ == "__main__":
     generate_training_data(100)

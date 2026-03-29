@@ -11,12 +11,23 @@ export default function BioreactorDashboard() {
   const [data, setData] = useState([]);
   const [history, setHistory] = useState([]);
   const [loading, setLoading] = useState(false);
+  const [sessionID, setSessionID] = useState("");
+  useEffect(() => {
+    let id = localStorage.getItem("bioreactor_session_id");
+    if (!id) {
+      id = Math.random().toString(36).substring(2, 15);
+      localStorage.setItem("bioreactor_session_id", id);
+    }
+    setSessionID(id);
+
+  }, []);
 
   // Fetch History from MongoDB
-  const fetchHistory = async () => {
+  const fetchHistory = async (id = sessionID) => {
+    if (!id) return;
     try {
       const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
-      const response = await fetch(`${API_BASE}/history`);
+      const response = await fetch(`${API_BASE}/history/?session_id=${id}`);
       const result = await response.json();
       if (result.status === 'success') {
         setHistory(result.history);
@@ -34,7 +45,7 @@ export default function BioreactorDashboard() {
       const response = await fetch(`${API_BASE}/simulate/hybrid`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ...params, t_end: 50, steps: 100 }),
+        body: JSON.stringify({ ...params, t_end: 50, steps: 100, session_ID: sessionID }),
       });
       const result = await response.json();
       setData(result.data);
@@ -46,10 +57,16 @@ export default function BioreactorDashboard() {
     }
   };
 
+  const clearHistory = async () => {
+    const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+    await fetch(`${API_BASE}/history/clear?session_ID=${sessionID}`, { method: 'DELETE' });
+    setHistory([]);
+  }
+
   // Initial Load
-  useEffect(() => { 
+  useEffect(() => {
     setIsClient(true);
-    runSimulation(); 
+    runSimulation();
     fetchHistory();
   }, []);
 
@@ -80,7 +97,7 @@ export default function BioreactorDashboard() {
           </h1>
           <p className="text-xs text-slate-500 font-mono mt-1">HYBRID PHYSICS-ML ANALYTICS ENGINE ACTIVE</p>
         </div>
-        <button 
+        <button
           onClick={runSimulation}
           disabled={loading}
           className="bg-cyan-600 hover:bg-cyan-500 text-white px-6 py-2 rounded-md flex items-center gap-2 font-bold transition-all disabled:opacity-50"
@@ -93,7 +110,7 @@ export default function BioreactorDashboard() {
       <div className="grid grid-cols-12 gap-8">
         {/* LEFT COLUMN: Controls & History */}
         <div className="col-span-12 lg:col-span-3 space-y-6">
-          
+
           {/* Parameters Panel */}
           <div className="bg-slate-900/50 p-6 rounded-xl border border-slate-800 shadow-2xl">
             <h2 className="text-sm font-bold mb-6 flex items-center gap-2 border-b border-slate-800 pb-2">
@@ -104,13 +121,37 @@ export default function BioreactorDashboard() {
             <InputField label="Yield (Y)" name="Y" min="0.1" max="0.9" step="0.05" />
             <InputField label="Dilution Rate (D)" name="D" min="0.0" max="0.5" step="0.01" />
             <InputField label="Feed Substrate (Sf)" name="Sf" min="10" max="100" step="5" />
-            
+
             <div className="mt-8 pt-6 border-t border-slate-800">
               <h2 className="text-sm font-bold mb-4 flex items-center gap-2 text-rose-400">
                 <AlertTriangle size={16} /> ML CORRECTION
               </h2>
               <InputField label="Unmodeled Toxicity" name="toxicity_factor" min="0.0" max="0.5" step="0.01" />
             </div>
+          </div>
+          {/* This is the container for your history section */}
+          <div className="mt-8">
+            <div className="flex justify-between items-center mb-4">
+              <h2 className="text-xl font-bold">Cloud History</h2>
+
+              {/* The New Clear History Button */}
+              <button
+                onClick={clearHistory}
+                disabled={history.length === 0} // Disable if there's no history to clear
+                className="px-3 py-1 text-sm bg-red-100 text-red-600 border border-red-200 rounded hover:bg-red-200 disabled:opacity-50 transition-colors"
+              >
+                Clear History
+              </button>
+            </div>
+
+            {/* Your existing history table/list goes here */}
+            {history.length > 0 ? (
+              <div className="bg-white rounded border shadow p-4">
+                {/* ... your map function for history items ... */}
+              </div>
+            ) : (
+              <p className="text-gray-500">No simulation history found.</p>
+            )}
           </div>
 
           {/* Cloud Batch History Panel */}
@@ -123,8 +164,8 @@ export default function BioreactorDashboard() {
                 <p className="text-xs text-slate-500 font-mono text-center py-4">No batches recorded yet.</p>
               ) : (
                 history.map((run: any, idx: number) => (
-                  <div 
-                    key={idx} 
+                  <div
+                    key={idx}
                     onClick={() => {
                       if (run.data) setData(run.data);
                       if (run.parameters) setParams(run.parameters);
@@ -164,7 +205,7 @@ export default function BioreactorDashboard() {
                   <XAxis dataKey="time" stroke="#64748b" fontSize={12} label={{ value: 'Time (hours)', position: 'insideBottom', offset: -5 }} />
                   <YAxis stroke="#64748b" fontSize={12} label={{ value: 'Conc (g/L)', angle: -90, position: 'insideLeft' }} />
                   <Tooltip contentStyle={{ backgroundColor: '#0f172a', border: '1px solid #1e293b' }} />
-                  <Legend verticalAlign="top" height={36}/>
+                  <Legend verticalAlign="top" height={36} />
                   <Line type="monotone" dataKey="ideal_biomass" stroke="#94a3b8" strokeDasharray="5 5" name="Pure Physics (Monod)" strokeWidth={2} dot={false} />
                   <Line type="monotone" dataKey="hybrid_biomass" stroke="#06b6d4" name="Hybrid Prediction (ML-Corrected)" strokeWidth={3} dot={false} />
                 </LineChart>
