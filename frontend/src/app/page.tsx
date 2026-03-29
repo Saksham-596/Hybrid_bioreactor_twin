@@ -1,7 +1,7 @@
 "use client";
 import React, { useState, useEffect } from 'react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, AreaChart, Area } from 'recharts';
-import { Activity, AlertTriangle, Play, Beaker, Settings2, Database } from 'lucide-react';
+import { Activity, AlertTriangle, Play, Beaker, Settings2, Database, Trash2 } from 'lucide-react';
 
 export default function BioreactorDashboard() {
   const [isClient, setIsClient] = useState(false);
@@ -12,44 +12,52 @@ export default function BioreactorDashboard() {
   const [history, setHistory] = useState([]);
   const [loading, setLoading] = useState(false);
   const [sessionID, setSessionID] = useState("");
+
   useEffect(() => {
     let id = localStorage.getItem("bioreactor_session_id");
     if (!id) {
-      id = Math.random().toString(36).substring(2, 15);
+      id = "session_" + Math.random().toString(36).substring(2, 15);
       localStorage.setItem("bioreactor_session_id", id);
     }
     setSessionID(id);
-
+    setIsClient(true);
   }, []);
 
-  // Fetch History from MongoDB
-  const fetchHistory = async (id = sessionID) => {
+  useEffect(() => {
+    if (sessionID) {
+      fetchHistory(sessionID);
+    }
+  }, [sessionID]);
+
+  const fetchHistory = async (id: string) => {
     if (!id) return;
     try {
       const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
-      const response = await fetch(`${API_BASE}/history/?session_id=${id}`);
-      const result = await response.json();
-      if (result.status === 'success') {
-        setHistory(result.history);
+      const response = await fetch(`${API_BASE}/history?session_id=${id}`);
+      if (response.ok) {
+        const result = await response.json();
+        if (result.status === 'success') {
+          setHistory(result.history);
+        }
       }
     } catch (error) {
       console.error("Failed to fetch history:", error);
     }
   };
-
-  // Run Simulation & Update History
+  
   const runSimulation = async () => {
+    if (!sessionID) return;
     setLoading(true);
     try {
       const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
       const response = await fetch(`${API_BASE}/simulate/hybrid`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ...params, t_end: 50, steps: 100, session_ID: sessionID }),
+        body: JSON.stringify({ ...params, t_end: 50, steps: 100, session_id: sessionID }),
       });
       const result = await response.json();
       setData(result.data);
-      await fetchHistory(); // Trigger a history update immediately after running
+      await fetchHistory(sessionID); 
     } catch (error) {
       console.error("Simulation failed:", error);
     } finally {
@@ -58,17 +66,16 @@ export default function BioreactorDashboard() {
   };
 
   const clearHistory = async () => {
-    const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
-    await fetch(`${API_BASE}/history/clear?session_ID=${sessionID}`, { method: 'DELETE' });
-    setHistory([]);
-  }
-
-  // Initial Load
-  useEffect(() => {
-    setIsClient(true);
-    runSimulation();
-    fetchHistory();
-  }, []);
+    if (!sessionID) return;
+    try {
+      const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+      await fetch(`${API_BASE}/history/clear?session_id=${sessionID}`, { method: 'DELETE' });
+      setHistory([]);
+      setData([]);
+    } catch (error) {
+      console.error("Failed to clear history:", error);
+    }
+  };
 
   const InputField = ({ label, name, min, max, step }: any) => (
     <div className="mb-4">
@@ -85,11 +92,10 @@ export default function BioreactorDashboard() {
     </div>
   );
 
-  if (!isClient) return null; // Prevents Recharts width(-1) error on SSR
+  if (!isClient) return null; 
 
   return (
     <main className="min-h-screen bg-slate-950 text-slate-100 p-8 font-sans">
-      {/* Header */}
       <div className="flex justify-between items-center mb-8 border-b border-slate-800 pb-4">
         <div>
           <h1 className="text-2xl font-black tracking-tighter flex items-center gap-2">
@@ -108,10 +114,7 @@ export default function BioreactorDashboard() {
       </div>
 
       <div className="grid grid-cols-12 gap-8">
-        {/* LEFT COLUMN: Controls & History */}
         <div className="col-span-12 lg:col-span-3 space-y-6">
-
-          {/* Parameters Panel */}
           <div className="bg-slate-900/50 p-6 rounded-xl border border-slate-800 shadow-2xl">
             <h2 className="text-sm font-bold mb-6 flex items-center gap-2 border-b border-slate-800 pb-2">
               <Settings2 size={16} /> PARAMETERS
@@ -129,39 +132,27 @@ export default function BioreactorDashboard() {
               <InputField label="Unmodeled Toxicity" name="toxicity_factor" min="0.0" max="0.5" step="0.01" />
             </div>
           </div>
-          {/* This is the container for your history section */}
-          <div className="mt-8">
-            <div className="flex justify-between items-center mb-4">
-              <h2 className="text-xl font-bold">Cloud History</h2>
 
-              {/* The New Clear History Button */}
+          <div className="bg-slate-900/50 p-6 rounded-xl border border-slate-800 shadow-2xl flex flex-col `h-87.5`">
+            <div className="flex justify-between items-center mb-4 border-b border-slate-800 pb-2">
+              <h2 className="text-sm font-bold flex items-center gap-2 text-slate-300">
+                <Database size={16} className="text-cyan-400" /> CLOUD HISTORY
+              </h2>
               <button
                 onClick={clearHistory}
-                disabled={history.length === 0} // Disable if there's no history to clear
-                className="px-3 py-1 text-sm bg-red-100 text-red-600 border border-red-200 rounded hover:bg-red-200 disabled:opacity-50 transition-colors"
+                disabled={history.length === 0}
+                className="text-xs flex items-center gap-1 bg-slate-800 hover:bg-rose-900/50 text-rose-400 border border-slate-700 hover:border-rose-500 px-2 py-1 rounded transition-colors disabled:opacity-30 disabled:hover:bg-slate-800 disabled:hover:border-slate-700 disabled:cursor-not-allowed"
+                title="Clear my session history"
               >
-                Clear History
+                <Trash2 size={12} /> CLEAR
               </button>
             </div>
-
-            {/* Your existing history table/list goes here */}
-            {history.length > 0 ? (
-              <div className="bg-white rounded border shadow p-4">
-                {/* ... your map function for history items ... */}
-              </div>
-            ) : (
-              <p className="text-gray-500">No simulation history found.</p>
-            )}
-          </div>
-
-          {/* Cloud Batch History Panel */}
-          <div className="bg-slate-900/50 p-6 rounded-xl border border-slate-800 shadow-2xl">
-            <h2 className="text-sm font-bold mb-4 flex items-center gap-2 text-slate-300 border-b border-slate-800 pb-2">
-              <Database size={16} className="text-cyan-400" /> CLOUD BATCH HISTORY
-            </h2>
-            <div className="space-y-3 max-h-64 overflow-y-auto pr-2 custom-scrollbar">
+            
+            <div className="space-y-3 overflow-y-auto pr-2 custom-scrollbar grow">
               {history.length === 0 ? (
-                <p className="text-xs text-slate-500 font-mono text-center py-4">No batches recorded yet.</p>
+                <div className="flex items-center justify-center h-full">
+                  <p className="text-xs text-slate-500 font-mono text-center">No batches recorded yet.</p>
+                </div>
               ) : (
                 history.map((run: any, idx: number) => (
                   <div
@@ -183,7 +174,7 @@ export default function BioreactorDashboard() {
                     <div className="text-right">
                       <p className="text-[10px] text-slate-400 font-mono uppercase tracking-wider">Final Mass</p>
                       <p className="text-sm font-bold text-cyan-400 font-mono">
-                        {run.final_hybrid_biomass.toFixed(2)}
+                        {run.final_hybrid_biomass?.toFixed(2) || "0.00"}
                       </p>
                     </div>
                   </div>
@@ -191,10 +182,8 @@ export default function BioreactorDashboard() {
               )}
             </div>
           </div>
-
         </div>
 
-        {/* RIGHT COLUMN: Main Chart Area */}
         <div className="col-span-12 lg:col-span-9 space-y-8">
           <div className="bg-slate-900/50 p-6 rounded-xl border border-slate-800">
             <h2 className="text-sm font-bold mb-4 text-slate-400 font-mono">PRIMARY ANALYTICS: BIOMASS GROWTH (X)</h2>
@@ -213,7 +202,6 @@ export default function BioreactorDashboard() {
             </div>
           </div>
 
-          {/* Secondary Error Chart */}
           <div className="bg-slate-900/50 p-6 rounded-xl border border-slate-800">
             <h2 className="text-sm font-bold mb-4 text-rose-400 font-mono">ML ERROR MAGNITUDE (RESIDUAL)</h2>
             <div style={{ width: '100%', height: 250 }}>
