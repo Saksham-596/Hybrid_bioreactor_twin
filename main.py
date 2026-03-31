@@ -147,7 +147,7 @@ client = AsyncIOMotorClient(MONGO_URI, tlsCAFile=certifi.where())
 db = client.biotwin_db        
 collection = db.batch_history
 
-# Load the 98.6% Accurate XGBoost Brain
+
 MODEL_PATH = "bio_twin_model.pkl"
 if os.path.exists(MODEL_PATH):
     model = joblib.load(MODEL_PATH)
@@ -155,7 +155,7 @@ if os.path.exists(MODEL_PATH):
 else:
     print("Warning: bio_twin_model.pkl not found. Endpoint will fail.")
 
-# The New API Payload: Real Physical Setpoints instead of Theoretical Math
+# The New API Payload
 class TwinParams(BaseModel):
     session_id: str = "anonymous"
     Aeration_rate: float = 60.0              # Fg:L/h
@@ -167,17 +167,15 @@ class TwinParams(BaseModel):
     Substrate_concentration: float = 10.0    # S:g/L
     O2_percent_outgas: float = 18.0          # O2:O2 (%)
     
-    # Simulation boundaries
-    t_end: float = 250.0 # Standard industrial batch duration (hours)
-    steps: int = 125     # Predict every 2 hours to keep the UI lightning fast
 
-# We keep the route as /simulate/hybrid so your Next.js fetch() doesn't break
+    t_end: float = 250.0 # hours
+    steps: int = 500     
+
 @app.post("/simulate/hybrid")
 async def run_twin_simulation(params: TwinParams):
-    # 1. Generate the timeline (X-axis for your graph)
     t_vec = np.linspace(0, params.t_end, params.steps)
     
-    # 2. Build the exact dataset the XGBoost model expects
+    # dataset the XGBoost model expects
     input_df = pd.DataFrame({
         'Time (h)': t_vec,
         'Aeration rate(Fg:L/h)': params.Aeration_rate,
@@ -189,21 +187,20 @@ async def run_twin_simulation(params: TwinParams):
         'Substrate concentration(S:g/L)': params.Substrate_concentration,
         'Oxygen in percent in off-gas(O2:O2  (%))': params.O2_percent_outgas
     })
-    
-    # 3. Vectorized Prediction (Calculates all 125 hours in ~10 milliseconds)
-    predictions = model.predict(input_df)
+    raw_predictions = model.predict(input_df)
 
-    # 4. Format the output for Next.js Recharts
+    smoothed_predictions = pd.Series(raw_predictions).ewm(span=40).mean().values
+
+    # Next.js Recharts
     results = []
     for i in range(len(t_vec)):
+        val = max(0.0, float(smoothed_predictions[i]))
         results.append({
             "time": round(float(t_vec[i]), 2),
-            # We map to "hybrid_biomass" so your existing frontend graph code doesn't instantly break
-            "hybrid_biomass": max(0.0, round(float(predictions[i]), 4)),
-            "predicted_biomass_g_L": max(0.0, round(float(predictions[i]), 4)) 
+            "hybrid_biomass": round(val, 4),
+            "predicted_biomass_g_L": round(val, 4) 
         })
-    
-    # 5. Log the batch to MongoDB
+    # mongoDB
     batch_record = {
         "session_id": params.session_id,
         "timestamp": datetime.utcnow().isoformat(),
@@ -216,7 +213,7 @@ async def run_twin_simulation(params: TwinParams):
         
     return {
         "status": "success", 
-        "r_squared_confidence": 0.9868, # Hardcoded from your actual validation test!
+        "r_squared_confidence": 0.9868,
         "data": results
     }
 
