@@ -10,6 +10,7 @@ Industrial fermentation is notoriously non-linear. Standard textbook physics (Mo
 Confidence Score: 98.68% R² on unseen hold-out test data.Inference Speed: ~2.1ms for a 250-hour simulation (500 data points).Smoothing: Applied Exponential Moving Averages (EMA) to XGBoost discrete outputs to simulate biological inertia and continuous growth curves.
 ## 🧩 Architecture Details
 1. The Physics Engine (scipy.integrate.odeint)Uses a system of ordinary differential equations (ODEs) to calculate the "Theoretical Max" growth curve:
-$$\mu = \frac{\mu_{max} \cdot S}{K_s + S}$$$$\frac{dX}{dt} = (\mu - D)X$$
+$$\mu = \frac{\mu_{max} \cdot S}{K_s + S}$$
+$$\frac{dX}{dt} = (\mu - D)X$$
 3. The ML Reality Engine (XGBoost)A gradient-boosted decision tree pipeline that maps real-time setpoints (Air Head Pressure, Vessel Weight, Oil Flow, etc.) to empirical biomass yield.
 4. Feature SelectionInstead of training on all available columns, the model was distilled down to the 8 physical drivers that govern oxygen transfer ($k_L a$) and nutrient metabolism, ensuring the model generalizes to new batches without over-fitting to sensor noise.
