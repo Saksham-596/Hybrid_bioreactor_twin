@@ -1,6 +1,6 @@
 "use client";
 import React, { useState, useEffect } from 'react';
-import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ReferenceLine } from 'recharts';
+import { AreaChart, Area, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ReferenceLine } from 'recharts';
 import { Activity, Play, Factory, Settings2, Database, Trash2, Wind, Droplets } from 'lucide-react';
 
 export default function BioreactorDashboard() {
@@ -99,7 +99,6 @@ export default function BioreactorDashboard() {
     </div>
   );
 
-  // Helper to color-code the final yield in history
   const getYieldColor = (yieldVal: number) => {
     if (yieldVal >= 15) return "text-emerald-400";
     if (yieldVal >= 10) return "text-amber-400";
@@ -209,10 +208,10 @@ export default function BioreactorDashboard() {
             <div className="flex justify-between items-center mb-6 border-b border-slate-800 pb-4">
               <h2 className="text-sm font-bold text-slate-300 font-mono flex items-center gap-2">
                 <Activity size={18} className="text-cyan-400" />
-                BIOMASS GROWTH PREDICTION (250 HOURS)
+                HYBRID DIGITAL TWIN (250 HOURS)
               </h2>
               <div className="text-right">
-                <span className="text-[10px] text-slate-400 uppercase tracking-wider block">Model Confidence</span>
+                <span className="text-[10px] text-slate-400 uppercase tracking-wider block">ML Confidence</span>
                 <span className="text-sm font-mono font-bold text-emerald-400">R² = 98.68%</span>
               </div>
             </div>
@@ -242,16 +241,16 @@ export default function BioreactorDashboard() {
                   />
                   <Tooltip 
                     contentStyle={{ backgroundColor: '#0f172a', border: '1px solid #1e293b', borderRadius: '8px' }}
-                    itemStyle={{ color: '#06b6d4', fontWeight: 'bold' }}
                     labelStyle={{ color: '#94a3b8', marginBottom: '4px' }}
-                    formatter={(value) => {
+                    formatter={(value: any, name: string | number | undefined) => {
                       const numeric = typeof value === 'number' ? value : Number(value) || 0;
-                      return [`${numeric.toFixed(2)} g/L`, 'Biomass'];
+                      if (name === "predicted_biomass_g_L") return [`${numeric.toFixed(2)} g/L`, "ML Prediction (Reality)"];
+                      if (name === "ideal_biomass") return [`${numeric.toFixed(2)} g/L`, "Monod Kinetics (Ideal)"];
+                      return [value, name];
                     }}
                     labelFormatter={(label) => `Time: ${Math.round(Number(label))} hours`}
                   />
                   
-                  {/* The Target Reference Line */}
                   <ReferenceLine 
                     y={15} 
                     stroke="#ef4444" 
@@ -259,6 +258,7 @@ export default function BioreactorDashboard() {
                     label={{ position: 'top', value: 'TARGET YIELD (15 g/L)', fill: '#ef4444', fontSize: 10, fontFamily: 'monospace' }} 
                   />
 
+                  
                   <Area 
                     type="monotone" 
                     dataKey="predicted_biomass_g_L" 
@@ -266,9 +266,19 @@ export default function BioreactorDashboard() {
                     strokeWidth={3}
                     fillOpacity={1} 
                     fill="url(#colorBiomass)" 
-                    name="Predicted Biomass" 
                     isAnimationActive={true}
                   />
+
+                  
+                  <Line 
+                    type="monotone" 
+                    dataKey="ideal_biomass" 
+                    stroke="#94a3b8" 
+                    strokeWidth={2} 
+                    strokeDasharray="5 5" 
+                    dot={false} 
+                  />
+
                 </AreaChart>
               </ResponsiveContainer>
             </div>

@@ -124,13 +124,14 @@ import certifi
 from dotenv import load_dotenv
 from motor.motor_asyncio import AsyncIOMotorClient
 from datetime import datetime
+from scipy.integrate import odeint
 
 load_dotenv()
-app = FastAPI(title="Bioreactor Digital Twin")
+app = FastAPI(title="Bioreactor Hybrid Twin")
 
 origins = [
     "https://hybrid-bioreactor-twin.vercel.app",
-    "http://localhost:3000"  # Local development
+    "http://localhost:3000"  
 ]
 
 app.add_middleware(
@@ -141,12 +142,10 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# MongoDB Connection
 MONGO_URI = os.getenv("MONGO_URI")
 client = AsyncIOMotorClient(MONGO_URI, tlsCAFile=certifi.where())
 db = client.biotwin_db        
 collection = db.batch_history
-
 
 MODEL_PATH = "bio_twin_model.pkl"
 if os.path.exists(MODEL_PATH):
@@ -155,27 +154,39 @@ if os.path.exists(MODEL_PATH):
 else:
     print("Warning: bio_twin_model.pkl not found. Endpoint will fail.")
 
-# The New API Payload
+#(Monod Kinetics)
+def monod_kinetics(y, t, mu_max, Ks, Y, D, Sf):
+    X, S = y
+    mu = (mu_max * S) / (Ks + S)
+    dXdt = (mu - D) * X
+    dSdt = D * (Sf - S) - (mu * X) / Y
+    return [dXdt, dSdt]
+
 class TwinParams(BaseModel):
     session_id: str = "anonymous"
-    Aeration_rate: float = 60.0              # Fg:L/h
-    Vessel_Weight: float = 60000.0           # Wt:Kg
-    Air_head_pressure: float = 1.1           # pressure:bar
-    DO2: float = 15.0                        # DO2:mg/L
-    Oil_flow: float = 20.0                   # Foil:L/hr
-    Vessel_Volume: float = 60000.0           # V:L
-    Substrate_concentration: float = 10.0    # S:g/L
-    O2_percent_outgas: float = 18.0          # O2:O2 (%)
+    Aeration_rate: float = 60.0              
+    Vessel_Weight: float = 60000.0           
+    Air_head_pressure: float = 1.1           
+    DO2: float = 15.0                        
+    Oil_flow: float = 20.0                   
+    Vessel_Volume: float = 60000.0           
+    Substrate_concentration: float = 10.0    
+    O2_percent_outgas: float = 18.0          
     
-
-    t_end: float = 250.0 # hours
+    t_end: float = 250.0 
     steps: int = 500     
 
 @app.post("/simulate/hybrid")
 async def run_twin_simulation(params: TwinParams):
     t_vec = np.linspace(0, params.t_end, params.steps)
     
-    # dataset the XGBoost model expects
+    
+    y0 = [0.1, params.Substrate_concentration] 
+    args = (0.5, 2.0, 0.5, 0.05, params.Substrate_concentration) 
+    ideal_solution = odeint(monod_kinetics, y0, t_vec, args=args)
+    ideal_X = ideal_solution[:, 0]
+
+    #  (With Smoothing)
     input_df = pd.DataFrame({
         'Time (h)': t_vec,
         'Aeration rate(Fg:L/h)': params.Aeration_rate,
@@ -187,20 +198,21 @@ async def run_twin_simulation(params: TwinParams):
         'Substrate concentration(S:g/L)': params.Substrate_concentration,
         'Oxygen in percent in off-gas(O2:O2  (%))': params.O2_percent_outgas
     })
+    
     raw_predictions = model.predict(input_df)
-
     smoothed_predictions = pd.Series(raw_predictions).ewm(span=40).mean().values
 
-    # Next.js Recharts
+    
     results = []
     for i in range(len(t_vec)):
-        val = max(0.0, float(smoothed_predictions[i]))
+        ml_val = max(0.0, float(smoothed_predictions[i]))
+        ideal_val = max(0.0, float(ideal_X[i]))
         results.append({
             "time": round(float(t_vec[i]), 2),
-            "hybrid_biomass": round(val, 4),
-            "predicted_biomass_g_L": round(val, 4) 
+            "predicted_biomass_g_L": round(ml_val, 4),
+            "ideal_biomass": round(ideal_val, 4) 
         })
-    # mongoDB
+    
     batch_record = {
         "session_id": params.session_id,
         "timestamp": datetime.utcnow().isoformat(),
@@ -213,7 +225,7 @@ async def run_twin_simulation(params: TwinParams):
         
     return {
         "status": "success", 
-        "r_squared_confidence": 0.9868,
+        "r_squared_confidence": 0.9868, 
         "data": results
     }
 
