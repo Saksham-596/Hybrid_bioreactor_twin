@@ -182,7 +182,7 @@ async def run_twin_simulation(params: TwinParams):
     
     
     y0 = [0.1, params.Substrate_concentration] 
-    args = (0.5, 2.0, 0.5, 0.05, params.Substrate_concentration) 
+    args = (0.5, 2.0, 1.5, 0.05, params.Substrate_concentration*1.6) 
     ideal_solution = odeint(monod_kinetics, y0, t_vec, args=args)
     ideal_X = ideal_solution[:, 0]
 

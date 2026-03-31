@@ -51,7 +51,7 @@ export default function BioreactorDashboard() {
       console.error("Failed to fetch history:", error);
     }
   };
-  
+
   const runSimulation = async () => {
     if (!sessionID) return;
     setLoading(true);
@@ -64,7 +64,7 @@ export default function BioreactorDashboard() {
       });
       const result = await response.json();
       setData(result.data);
-      await fetchHistory(sessionID); 
+      await fetchHistory(sessionID);
     } catch (error) {
       console.error("Simulation failed:", error);
     } finally {
@@ -105,7 +105,7 @@ export default function BioreactorDashboard() {
     return "text-rose-400";
   };
 
-  if (!isClient) return null; 
+  if (!isClient) return null;
 
   return (
     <main className="min-h-screen bg-slate-950 text-slate-100 p-8 font-sans">
@@ -134,7 +134,7 @@ export default function BioreactorDashboard() {
                 <Settings2 size={16} className="text-cyan-400" /> SETPOINTS
               </h2>
             </div>
-            
+
             <h3 className="text-xs font-bold text-emerald-400 mb-4 flex items-center gap-1"><Wind size={14} /> GAS & PRESSURE</h3>
             <InputField label="Aeration Rate (L/h)" name="Aeration_rate" min="0" max="150" step="1" />
             <InputField label="Air Head Pressure (bar)" name="Air_head_pressure" min="0.5" max="2.0" step="0.1" />
@@ -163,7 +163,7 @@ export default function BioreactorDashboard() {
                 <Trash2 size={12} /> CLEAR
               </button>
             </div>
-            
+
             <div className="space-y-3 overflow-y-auto pr-2 custom-scrollbar grow">
               {history.length === 0 ? (
                 <div className="flex items-center justify-center h-full">
@@ -215,7 +215,7 @@ export default function BioreactorDashboard() {
                 <span className="text-sm font-mono font-bold text-emerald-400">R² = 98.68%</span>
               </div>
             </div>
-            
+
             <div className="w-full grow">
               <ResponsiveContainer width="100%" height="100%">
                 <AreaChart data={data} margin={{ top: 10, right: 30, left: 0, bottom: 0 }}>
@@ -226,57 +226,58 @@ export default function BioreactorDashboard() {
                     </linearGradient>
                   </defs>
                   <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" vertical={false} />
-                  <XAxis 
-                    dataKey="time" 
-                    stroke="#64748b" 
-                    fontSize={12} 
+                  <XAxis
+                    dataKey="time"
+                    stroke="#64748b"
+                    fontSize={12}
                     tickFormatter={(val) => `${Math.round(val)}h`}
                     minTickGap={30}
                   />
-                  <YAxis 
-                    stroke="#64748b" 
-                    fontSize={12} 
+                  <YAxis
+                    stroke="#64748b"
+                    fontSize={12}
                     tickFormatter={(val) => `${val}`}
-                    domain={[0, 'dataMax + 2']} 
+                    domain={[0, 'dataMax + 2']}
                   />
-                  <Tooltip 
+                  <Tooltip
                     contentStyle={{ backgroundColor: '#0f172a', border: '1px solid #1e293b', borderRadius: '8px' }}
                     labelStyle={{ color: '#94a3b8', marginBottom: '4px' }}
-                    formatter={(value: any, name: string | number | undefined) => {
+                    formatter={(value: any, name: any) => {
                       const numeric = typeof value === 'number' ? value : Number(value) || 0;
                       if (name === "predicted_biomass_g_L") return [`${numeric.toFixed(2)} g/L`, "ML Prediction (Reality)"];
-                      if (name === "ideal_biomass") return [`${numeric.toFixed(2)} g/L`, "Monod Kinetics (Ideal)"];
+                      if (name === "ideal_biomass") return [`${numeric.toFixed(2)} g/L`, "Theoretical Max (Calibrated Strain)"];
                       return [value, name];
                     }}
                     labelFormatter={(label) => `Time: ${Math.round(Number(label))} hours`}
                   />
-                  
-                  <ReferenceLine 
-                    y={15} 
-                    stroke="#ef4444" 
-                    strokeDasharray="3 3" 
-                    label={{ position: 'top', value: 'TARGET YIELD (15 g/L)', fill: '#ef4444', fontSize: 10, fontFamily: 'monospace' }} 
+
+                  <ReferenceLine
+                    y={15}
+                    stroke="#ef4444"
+                    strokeDasharray="3 3"
+                    label={{ position: 'top', value: 'TARGET YIELD (15 g/L)', fill: '#ef4444', fontSize: 10, fontFamily: 'monospace' }}
                   />
 
-                  
-                  <Area 
-                    type="monotone" 
-                    dataKey="predicted_biomass_g_L" 
-                    stroke="#06b6d4" 
+
+                  <Area
+                    type="monotone"
+                    dataKey="predicted_biomass_g_L"
+                    stroke="#06b6d4"
                     strokeWidth={3}
-                    fillOpacity={1} 
-                    fill="url(#colorBiomass)" 
+                    fillOpacity={1}
+                    fill="url(#colorBiomass)"
                     isAnimationActive={true}
                   />
 
-                  
-                  <Line 
-                    type="monotone" 
-                    dataKey="ideal_biomass" 
-                    stroke="#94a3b8" 
-                    strokeWidth={2} 
-                    strokeDasharray="5 5" 
-                    dot={false} 
+
+                  <Line
+                    type="monotone"
+                    dataKey="ideal_biomass"
+                    stroke="#94a3b8"
+                    strokeWidth={2}
+                    strokeDasharray="5 5"
+                    dot={false}
+                    name="Theoretical Max"
                   />
 
                 </AreaChart>
