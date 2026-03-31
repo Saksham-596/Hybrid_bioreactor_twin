@@ -1,6 +1,6 @@
 "use client";
 import React, { useState, useEffect } from 'react';
-import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
+import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ReferenceLine } from 'recharts';
 import { Activity, Play, Factory, Settings2, Database, Trash2, Wind, Droplets } from 'lucide-react';
 
 export default function BioreactorDashboard() {
@@ -99,6 +99,13 @@ export default function BioreactorDashboard() {
     </div>
   );
 
+  // Helper to color-code the final yield in history
+  const getYieldColor = (yieldVal: number) => {
+    if (yieldVal >= 15) return "text-emerald-400";
+    if (yieldVal >= 10) return "text-amber-400";
+    return "text-rose-400";
+  };
+
   if (!isClient) return null; 
 
   return (
@@ -164,31 +171,34 @@ export default function BioreactorDashboard() {
                   <p className="text-xs text-slate-500 font-mono text-center">No batches recorded.</p>
                 </div>
               ) : (
-                history.map((run: any, idx: number) => (
-                  <div
-                    key={idx}
-                    onClick={() => {
-                      if (run.data) setData(run.data);
-                      if (run.parameters) setParams(run.parameters);
-                    }}
-                    className="bg-slate-800/50 p-3 rounded border border-slate-700 flex justify-between items-center hover:bg-slate-700 cursor-pointer transition-colors"
-                  >
-                    <div>
-                      <p className="text-[10px] text-slate-400 font-mono">
-                        {new Date(run.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                      </p>
-                      <p className="text-xs font-bold text-amber-400 font-mono mt-1">
-                        Vol: {(run.parameters.Vessel_Volume / 1000).toFixed(0)}k L
-                      </p>
+                history.map((run: any, idx: number) => {
+                  const yieldVal = run.final_predicted_biomass || 0;
+                  return (
+                    <div
+                      key={idx}
+                      onClick={() => {
+                        if (run.data) setData(run.data);
+                        if (run.parameters) setParams(run.parameters);
+                      }}
+                      className="bg-slate-800/50 p-3 rounded border border-slate-700 flex justify-between items-center hover:bg-slate-700 cursor-pointer transition-colors"
+                    >
+                      <div>
+                        <p className="text-[10px] text-slate-400 font-mono">
+                          {new Date(run.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                        </p>
+                        <p className="text-xs font-bold text-amber-400 font-mono mt-1">
+                          Vol: {(run.parameters.Vessel_Volume / 1000).toFixed(0)}k L
+                        </p>
+                      </div>
+                      <div className="text-right">
+                        <p className="text-[9px] text-slate-400 font-mono uppercase tracking-wider">Final Yield</p>
+                        <p className={`text-sm font-bold font-mono ${getYieldColor(yieldVal)}`}>
+                          {yieldVal.toFixed(2)} g/L
+                        </p>
+                      </div>
                     </div>
-                    <div className="text-right">
-                      <p className="text-[9px] text-slate-400 font-mono uppercase tracking-wider">Final Yield</p>
-                      <p className="text-sm font-bold text-cyan-400 font-mono">
-                        {run.final_predicted_biomass?.toFixed(2) || "0.00"} g/L
-                      </p>
-                    </div>
-                  </div>
-                ))
+                  );
+                })
               )}
             </div>
           </div>
@@ -221,13 +231,14 @@ export default function BioreactorDashboard() {
                     dataKey="time" 
                     stroke="#64748b" 
                     fontSize={12} 
-                    tickFormatter={(val) => `${val}h`}
+                    tickFormatter={(val) => `${Math.round(val)}h`}
                     minTickGap={30}
                   />
                   <YAxis 
                     stroke="#64748b" 
                     fontSize={12} 
                     tickFormatter={(val) => `${val}`}
+                    domain={[0, 'dataMax + 2']} 
                   />
                   <Tooltip 
                     contentStyle={{ backgroundColor: '#0f172a', border: '1px solid #1e293b', borderRadius: '8px' }}
@@ -237,8 +248,17 @@ export default function BioreactorDashboard() {
                       const numeric = typeof value === 'number' ? value : Number(value) || 0;
                       return [`${numeric.toFixed(2)} g/L`, 'Biomass'];
                     }}
-                    labelFormatter={(label) => `Time: ${label} hours`}
+                    labelFormatter={(label) => `Time: ${Math.round(Number(label))} hours`}
                   />
+                  
+                  {/* The Target Reference Line */}
+                  <ReferenceLine 
+                    y={15} 
+                    stroke="#ef4444" 
+                    strokeDasharray="3 3" 
+                    label={{ position: 'top', value: 'TARGET YIELD (15 g/L)', fill: '#ef4444', fontSize: 10, fontFamily: 'monospace' }} 
+                  />
+
                   <Area 
                     type="monotone" 
                     dataKey="predicted_biomass_g_L" 
